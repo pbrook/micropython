@@ -30,7 +30,7 @@ INC += $(KSDK_INC)
 CPU_CFLAGS = -mcpu=cortex-m4  -mfloat-abi=hard  -mfpu=fpv4-sp-d16  -mthumb -fsingle-precision-constant -Wdouble-promotion -mapcs -fshort-wchar
 CC_SYMBOLS = -DDEBUG -DCPU_MK64FN1M0VMD12 -DFRDM_K64F -DFREEDOM
 CFLAGS = $(INC) \
-	-Wall  -fno-common  -ffunction-sections  -fdata-sections  -ffreestanding  -fno-builtin  -std=gnu99\
+	-Wall  -fno-common  -ffunction-sections  -fdata-sections --std=gnu99\
        	$(CPU_CFLAGS) $(CC_SYMBOLS)
 
 #Debugging/Optimization
@@ -42,14 +42,47 @@ endif
 
 LDSCRIPT = platform/devices/MK64F12/linker/gcc/MK64FN1M0xxx12_flash.ld
 LDFLAGS = $(CPU_CFLAGS) -T$(LDSCRIPT) \
-	  --specs=nano.specs  -lm  -Wall  -fno-common  -ffunction-sections  -fdata-sections  -ffreestanding  -fno-builtin  \
+	  --specs=nano.specs  -Wall  -fno-common  -ffunction-sections  -fdata-sections \
 	  -static -Xlinker --gc-sections  -Xlinker -z  -Xlinker muldefs  -Xlinker --defsym=__stack_size__=0x2000 \
 	  -Xlinker --defsym=__heap_size__=0x2000 -Wl,-Map,$(BUILD)/firmware.map
 
-LIBS = -L. -lksdk_platform -lm -lc -lgcc -lnosys
+LIBS = -L. -lksdk_platform -lc -lgcc -lnosys
+
+LIB_C = $(addprefix lib/, \
+	libm/math.c \
+	libm/asinfacosf.c \
+	libm/atanf.c \
+	libm/atan2f.c \
+	libm/fmodf.c \
+	libm/roundf.c \
+	libm/log1pf.c \
+	libm/acoshf.c \
+	libm/asinhf.c \
+	libm/atanhf.c \
+	libm/kf_rem_pio2.c \
+	libm/kf_sin.c \
+	libm/kf_cos.c \
+	libm/kf_tan.c \
+	libm/ef_rem_pio2.c \
+	libm/erf_lgamma.c \
+	libm/sf_sin.c \
+	libm/sf_cos.c \
+	libm/sf_tan.c \
+	libm/sf_frexp.c \
+	libm/sf_modf.c \
+	libm/sf_ldexp.c \
+	libm/sf_erf.c \
+	libm/wf_lgamma.c \
+	libm/wf_tgamma.c \
+	mp-readline/readline.c \
+	utils/pyexec.c \
+	utils/stdout_helpers.c \
+	libc/string0.c \
+	)
 
 SDKBOARD = frdmk64f
 SRC_C = \
+	$(LIB_C) \
 	platform/utilities/src/fsl_misc_utilities.c \
     	$(SDKBOARD)/gpio_pins.c \
     	$(SDKBOARD)/pin_mux.c \
@@ -60,10 +93,6 @@ SRC_C = \
 	platform/devices/startup.c \
 	hardware_init.c \
 	main.c \
-	lib/mp-readline/readline.c \
-	lib/utils/pyexec.c \
-	lib/utils/stdout_helpers.c \
-	lib/libc/string0.c \
 	debug_uart.c
 #	printf.c \
 	string0.c \
