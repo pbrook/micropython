@@ -138,6 +138,9 @@ SRC_C = \
 	main.c \
 	storage.c \
 	virtual_com.c \
+	cube/cube_spi.c \
+	cube/moducube.c \
+	modutime.c \
 	debug_uart.c
 #	printf.c \
 	string0.c \
@@ -145,7 +148,7 @@ SRC_C = \
 	gccollect.c \
 
 
-SRC_QSTR += main.c $(STM_SRC_C) storage.c
+SRC_QSTR += main.c $(STM_SRC_C) storage.c cube/moducube.c modutime.c
 
 SRC_S = \
 	platform/devices/MK64F12/startup/gcc/startup_MK64F12.S

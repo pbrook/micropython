@@ -102,22 +102,6 @@
 #define MICROPY_PY_MACHINE_SPI_MIN_DELAY (0)
 //FIXME#define MICROPY_PY_FRAMEBUF         (1)
 
-#if 0
-#define MICROPY_HELPER_LEXER_UNIX   (0)
-#define MICROPY_ENABLE_DOC_STRING   (0)
-#define MICROPY_ERROR_REPORTING     (MICROPY_ERROR_REPORTING_TERSE)
-#define MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG (0)
-#define MICROPY_PY_ASYNC_AWAIT      (0)
-#define MICROPY_PY_ARRAY            (0)
-#define MICROPY_PY_ATTRTUPLE        (0)
-#define MICROPY_PY_COLLECTIONS      (0)
-#define MICROPY_PY_MATH             (0)
-#define MICROPY_PY_CMATH            (0)
-#define MICROPY_PY_IO               (0)
-#define MICROPY_PY_STRUCT           (0)
-#define MICROPY_PY_SYS              (0)
-#define MICROPY_CPYTHON_COMPAT      (0)
-#endif
 
 // extra built in names to add to the global namespace
 #define MICROPY_PORT_BUILTINS \
@@ -137,9 +121,12 @@ extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_utime;
 extern const struct _mp_obj_module_t mp_module_usocket;
 extern const struct _mp_obj_module_t mp_module_network;
+extern const struct _mp_obj_module_t mp_module_ucube;
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     { MP_OBJ_NEW_QSTR(MP_QSTR_uos), (mp_obj_t)&mp_module_uos }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ucube), (mp_obj_t)&mp_module_ucube }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_utime }, \
 
 #define MICROPY_PORT_BUILTIN_MODULE_WEAK_LINKS \
     { MP_OBJ_NEW_QSTR(MP_QSTR_binascii), (mp_obj_t)&mp_module_ubinascii }, \
@@ -148,6 +135,7 @@ extern const struct _mp_obj_module_t mp_module_network;
     { MP_OBJ_NEW_QSTR(MP_QSTR_json), (mp_obj_t)&mp_module_ujson }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR_heapq), (mp_obj_t)&mp_module_uheapq }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR_os), (mp_obj_t)&mp_module_uos }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_time), (mp_obj_t)&mp_module_utime }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR_struct), (mp_obj_t)&mp_module_ustruct }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR_errno), (mp_obj_t)&mp_module_uerrno }, \
 

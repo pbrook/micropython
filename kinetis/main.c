@@ -154,8 +154,11 @@ void DD(void)
 
 static char heap[4096];
 
+void init_ticks(void);
+
 int main(int argc, char **argv) {
     hardware_init();
+    init_ticks();
     DEBUG_printf("Hello World\n");
     LED1_EN;
     storage_init();
