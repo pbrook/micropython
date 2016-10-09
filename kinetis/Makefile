@@ -22,13 +22,29 @@ KSDK_INC = \
 	-Iplatform/system/inc \
 	-Ifrdmk64f
 
+USB_INC = \
+	-Iusb/usb_core/include \
+	-Iusb/adapter/sources \
+	-Iusb/adapter/sources/sdk \
+	-Iusb/usb_core/device/include/MK64F12 \
+	-Iusb/usb_core/device/include \
+	-Iusb/usb_core/device/sources/classes/cdc \
+	-Iusb/usb_core/device/sources/classes/common \
+	-Iusb/usb_core/device/sources/classes/composite \
+	-Iusb/usb_core/device/sources/classes/include \
+	-Iusb/usb_core/device/sources/classes/include/config \
+	-Iusb/usb_core/device/sources/classes/msd \
+	-Iusb/usb_core/device/sources/controller/khci \
+	-Iusb/usb_core/device/sources/controller \
+	-Iusb/usb_core/hal \
+
 INC =  -I.
 INC += -I..
 INC += -I$(BUILD)
 INC += -I../lib/mp-readline
 INC += -I../lib/timeutils
 
-INC += $(KSDK_INC)
+INC += $(KSDK_INC) $(USB_INC)
 
 CPU_CFLAGS = -mcpu=cortex-m4  -mfloat-abi=hard  -mfpu=fpv4-sp-d16  -mthumb -fsingle-precision-constant -Wdouble-promotion -mapcs -fshort-wchar
 CC_SYMBOLS = -DDEBUG -DCPU_MK64FN1M0VMD12 -DFRDM_K64F -DFREEDOM
@@ -49,7 +65,7 @@ LDFLAGS = $(CPU_CFLAGS) -T$(LDSCRIPT) \
 	  -static -Xlinker --gc-sections  -Xlinker -z  -Xlinker muldefs  -Xlinker --defsym=__stack_size__=0x2000 \
 	  -Xlinker --defsym=__heap_size__=0x2000 -Wl,-Map,$(BUILD)/firmware.map
 
-LIBS = -L. -lksdk_platform -lc -lgcc -lnosys
+LIBS = -L. -lksdk_platform -lusbd_bm -lc -lgcc -lnosys
 
 LIB_C = $(addprefix lib/, \
 	libm/math.c \
@@ -121,6 +137,7 @@ SRC_C = \
 	fatfs_port.c \
 	main.c \
 	storage.c \
+	virtual_com.c \
 	debug_uart.c
 #	printf.c \
 	string0.c \
