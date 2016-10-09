@@ -18,12 +18,15 @@ KSDK_INC = \
 	-Iplatform/devices/MK64F12/startup \
 	-Iplatform/hal/inc \
 	-Iplatform/drivers/inc \
+	-Iplatform/drivers/src/flash/C90TFS/drvsrc/include \
 	-Iplatform/system/inc \
 	-Ifrdmk64f
 
 INC =  -I.
 INC += -I..
 INC += -I$(BUILD)
+INC += -I../lib/mp-readline
+INC += -I../lib/timeutils
 
 INC += $(KSDK_INC)
 
@@ -40,7 +43,7 @@ else
 CFLAGS += -Os -DNDEBUG
 endif
 
-LDSCRIPT = platform/devices/MK64F12/linker/gcc/MK64FN1M0xxx12_flash.ld
+LDSCRIPT = MK64F12.ld
 LDFLAGS = $(CPU_CFLAGS) -T$(LDSCRIPT) \
 	  --specs=nano.specs  -Wall  -fno-common  -ffunction-sections  -fdata-sections \
 	  -static -Xlinker --gc-sections  -Xlinker -z  -Xlinker muldefs  -Xlinker --defsym=__stack_size__=0x2000 \
@@ -78,33 +81,61 @@ LIB_C = $(addprefix lib/, \
 	utils/pyexec.c \
 	utils/stdout_helpers.c \
 	libc/string0.c \
+	fatfs/ff.c \
+	fatfs/option/ccsbcs.c \
+	timeutils/timeutils.c \
 	)
 
 SDKBOARD = frdmk64f
+
+STM_SRC_C = $(addprefix stmhal/, \
+	gccollect.c \
+	pybstdio.c \
+	moduos.c \
+	builtin_open.c \
+	import.c \
+	lexerfatfs.c \
+	)
+
 SRC_C = \
 	$(LIB_C) \
+	$(STM_SRC_C) \
 	platform/utilities/src/fsl_misc_utilities.c \
     	$(SDKBOARD)/gpio_pins.c \
     	$(SDKBOARD)/pin_mux.c \
     	$(SDKBOARD)/board.c \
+    	$(SDKBOARD)/flash.c \
 	platform/utilities/src/fsl_debug_console.c \
 	platform/utilities/src/print_scan.c \
 	platform/devices/MK64F12/startup/system_MK64F12.c \
 	platform/devices/startup.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/CopyToRam.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashCommandSequence.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashEraseSector.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashGetSecurityState.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashInit.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashProgram.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashProgramCheck.c \
+    	platform/drivers/src/flash/C90TFS/drvsrc/source/FlashVerifySection.c \
 	hardware_init.c \
+	fatfs_port.c \
 	main.c \
+	storage.c \
 	debug_uart.c
 #	printf.c \
 	string0.c \
 	malloc0.c \
 	gccollect.c \
 
-SRC_CC = \
+
+SRC_QSTR += main.c $(STM_SRC_C) storage.c
 
 SRC_S = \
 	platform/devices/MK64F12/startup/gcc/startup_MK64F12.S
 
-OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o) $(SRC_CC:.cc=.o) $(SRC_S:.S=.o))
+STM_SRC_S = stmhal/gchelper.s
+
+OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o) $(SRC_CC:.cc=.o) $(SRC_S:.S=.o) $(STM_SRC_S:.s=.o))
 
 all: $(BUILD)/firmware.elf $(BUILD)/firmware.bin
 

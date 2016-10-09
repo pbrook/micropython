@@ -8,24 +8,142 @@
 #include "py/repl.h"
 #include "py/gc.h"
 #include "lib/utils/pyexec.h"
+#include "lib/fatfs/ff.h"
+#include "extmod/fsusermount.h"
+#include "storage.h"
 #include "board.h"
+#include "readline.h"
 
-void do_str(const char *src, mp_parse_input_kind_t input_kind) {
-    mp_lexer_t *lex = mp_lexer_new_from_str_len(MP_QSTR__lt_stdin_gt_, src, strlen(src), 0);
-    if (lex == NULL) {
+fs_user_mount_t fs_user_mount_flash;
+
+const mp_obj_type_t pyb_uart_type;
+
+static const char fresh_boot_py[] =
+"# boot.py -- run on boot-up\r\n"
+"# can run arbitrary Python, but best to keep it minimal\r\n"
+"\r\n"
+"#import machine\r\n"
+"#import pyb\r\n"
+"#pyb.main('main.py') # main script to run after this one\r\n"
+"#pyb.usb_mode('VCP+MSC') # act as a serial and a storage device\r\n"
+"#pyb.usb_mode('VCP+HID') # act as a serial device and a mouse\r\n"
+;
+
+static const char fresh_main_py[] =
+"# main.py -- put your code here!\r\n"
+;
+
+#if 0
+static const char fresh_pybcdc_inf[] =
+#include "genhdr/pybcdc_inf.h"
+;
+#endif
+
+static const char fresh_readme_txt[] =
+"This is a MicroPython board\r\n"
+"\r\n"
+"You can get started right away by writing your Python code in 'main.py'.\r\n"
+"\r\n"
+"For a serial prompt:\r\n"
+" - Windows: you need to go to 'Device manager', right click on the unknown device,\r\n"
+"   then update the driver software, using the 'pybcdc.inf' file found on this drive.\r\n"
+"   Then use a terminal program like Hyperterminal or putty.\r\n"
+" - Mac OS X: use the command: screen /dev/tty.usbmodem*\r\n"
+" - Linux: use the command: screen /dev/ttyACM0\r\n"
+"\r\n"
+"Please visit http://micropython.org/help/ for further help.\r\n"
+;
+
+void _exit(int code)
+{
+    while (1);
+}
+
+// avoid inlining to avoid stack usage within main()
+MP_NOINLINE STATIC void init_flash_fs() {
+    // init the vfs object
+    fs_user_mount_t *vfs = &fs_user_mount_flash;
+    vfs->str = "/flash";
+    vfs->len = 6;
+    vfs->flags = 0;
+    pyb_flash_init_vfs(vfs);
+
+    // put the flash device in slot 0 (it will be unused at this point)
+    MP_STATE_PORT(fs_user_mount)[0] = vfs;
+
+    // try to mount the flash
+    FRESULT res = f_mount(&vfs->fatfs, vfs->str, 1);
+
+    if (res == FR_NO_FILESYSTEM) {
+        // no filesystem so create a fresh one
+        res = f_mkfs("/flash", 0, 0);
+        if (res == FR_OK) {
+            // success creating fresh LFS
+        } else {
+            printf("PYB: can't create flash filesystem\n");
+            MP_STATE_PORT(fs_user_mount)[0] = NULL;
+            return;
+        }
+
+        // set label
+        f_setlabel("/flash/pybflash");
+
+        // create empty main.py
+        FIL fp;
+        f_open(&fp, "/flash/main.py", FA_WRITE | FA_CREATE_ALWAYS);
+        UINT n;
+        f_write(&fp, fresh_main_py, sizeof(fresh_main_py) - 1 /* don't count null terminator */, &n);
+        // TODO check we could write n bytes
+        f_close(&fp);
+
+#if 0
+        // create .inf driver file
+        f_open(&fp, "/flash/pybcdc.inf", FA_WRITE | FA_CREATE_ALWAYS);
+        f_write(&fp, fresh_pybcdc_inf, sizeof(fresh_pybcdc_inf) - 1 /* don't count null terminator */, &n);
+        f_close(&fp);
+#endif
+
+        // create readme file
+        f_open(&fp, "/flash/README.txt", FA_WRITE | FA_CREATE_ALWAYS);
+        f_write(&fp, fresh_readme_txt, sizeof(fresh_readme_txt) - 1 /* don't count null terminator */, &n);
+        f_close(&fp);
+
+    } else if (res == FR_OK) {
+        // mount sucessful
+    } else {
+        printf("PYB: can't mount flash\n");
+        MP_STATE_PORT(fs_user_mount)[0] = NULL;
         return;
     }
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        qstr source_name = lex->source_name;
-        mp_parse_tree_t parse_tree = mp_parse(lex, input_kind);
-        mp_obj_t module_fun = mp_compile(&parse_tree, source_name, MP_EMIT_OPT_NONE, true);
-        mp_call_function_0(module_fun);
-        nlr_pop();
+    // The current directory is used as the boot up directory.
+    // It is set to the internal flash filesystem by default.
+    f_chdrive("/flash");
+
+    // Make sure we have a /flash/boot.py.  Create it if needed.
+    FILINFO fno;
+#if _USE_LFN
+    fno.lfname = NULL;
+    fno.lfsize = 0;
+#endif
+    res = f_stat("/flash/boot.py", &fno);
+    if (res == FR_OK) {
+        if (fno.fattrib & AM_DIR) {
+            // exists as a directory
+            // TODO handle this case
+            // see http://elm-chan.org/fsw/ff/img/app2.c for a "rm -rf" implementation
+        } else {
+            // exists as a file, good!
+        }
     } else {
-        // uncaught exception
-        mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        // doesn't exist, create fresh file
+
+        FIL fp;
+        f_open(&fp, "/flash/boot.py", FA_WRITE | FA_CREATE_ALWAYS);
+        UINT n;
+        f_write(&fp, fresh_boot_py, sizeof(fresh_boot_py) - 1 /* don't count null terminator */, &n);
+        // TODO check we could write n bytes
+        f_close(&fp);
     }
 }
 
@@ -40,10 +158,20 @@ int main(int argc, char **argv) {
     hardware_init();
     DEBUG_printf("Hello World\n");
     LED1_EN;
-#if MICROPY_ENABLE_GC
+    storage_init();
     gc_init(heap, heap + sizeof(heap));
-#endif
     mp_init();
+    mp_obj_list_init(mp_sys_path, 0);
+    mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR_)); // current dir (or base dir of the script)
+    mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_flash));
+    mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_flash_slash_lib));
+    mp_obj_list_init(mp_sys_argv, 0);
+
+    // zero out the pointers to the mounted devices
+    memset(MP_STATE_PORT(fs_user_mount), 0, sizeof(MP_STATE_PORT(fs_user_mount)));
+
+    readline_init0();
+    init_flash_fs();
 #if MICROPY_REPL_EVENT_DRIVEN
     pyexec_event_repl_init();
     for (;;) {
@@ -59,27 +187,15 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void gc_collect(void) {
+void NORETURN __fatal_error(const char *msg) {
+    DEBUG_printf("FATAL: %s", msg);
+    while (1);
 }
-
-mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
-    return NULL;
-}
-
-mp_import_stat_t mp_import_stat(const char *path) {
-    return MP_IMPORT_STAT_NO_EXIST;
-}
-
-mp_obj_t mp_builtin_open(uint n_args, const mp_obj_t *args, mp_map_t *kwargs) {
-    return mp_const_none;
-}
-MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 1, mp_builtin_open);
 
 void nlr_jump_fail(void *val) {
-}
-
-void NORETURN __fatal_error(const char *msg) {
-    while (1);
+    DEBUG_printf("FATAL: uncaught exception %p\n", val);
+    mp_obj_print_exception(&mp_plat_print, (mp_obj_t)val);
+    __fatal_error("");
 }
 
 #ifndef NDEBUG
@@ -89,38 +205,3 @@ void MP_WEAK __assert_func(const char *file, int line, const char *func, const c
 }
 #endif
 
-/*
-int _lseek() {return 0;}
-int _read() {return 0;}
-int _write() {return 0;}
-int _close() {return 0;}
-void _exit(int x) {for(;;){}}
-int _sbrk() {return 0;}
-int _kill() {return 0;}
-int _getpid() {return 0;}
-int _fstat() {return 0;}
-int _isatty() {return 0;}
-
-void *malloc(size_t n) {return NULL;}
-void *calloc(size_t nmemb, size_t size) {return NULL;}
-void *realloc(void *ptr, size_t size) {return NULL;}
-void free(void *p) {}
-int printf(const char *m, ...) {return 0;}
-void *memcpy(void *dest, const void *src, size_t n) {return NULL;}
-int memcmp(const void *s1, const void *s2, size_t n) {return 0;}
-void *memmove(void *dest, const void *src, size_t n) {return NULL;}
-void *memset(void *s, int c, size_t n) {return NULL;}
-int strcmp(const char *s1, const char* s2) {return 0;}
-int strncmp(const char *s1, const char* s2, size_t n) {return 0;}
-size_t strlen(const char *s) {return 0;}
-char *strcat(char *dest, const char *src) {return NULL;}
-char *strchr(const char *dest, int c) {return NULL;}
-#include <stdarg.h>
-int vprintf(const char *format, va_list ap) {return 0;}
-int vsnprintf(char *str,  size_t  size,  const  char  *format, va_list ap) {return 0;}
-
-#undef putchar
-int putchar(int c) {return 0;}
-int puts(const char *s) {return 0;}
-
-*/
