@@ -16,15 +16,10 @@ void SysTick_Handler(void)
 
 void init_ticks(void)
 {
-DEBUG_printf("Inititalizing Timer\n");
     HWTIMER_SYS_Init(&ht, &kSystickDevif, 0, NULL);
-DEBUG_printf("Setting period\n");
     HWTIMER_SYS_SetPeriod(&ht, 1000);
-DEBUG_printf("Period Set\n");
     ht_period = HWTIMER_SYS_GetModulo(&ht);
-DEBUG_printf("modulo %d\n", ht_period);
     HWTIMER_SYS_Start(&ht);
-DEBUG_printf("Timer started\n");
 }
 
 static uint32_t micros(void)
